@@ -4,6 +4,8 @@
  *
  * Code formatting of current document
  *
+ * Version 0.3             added external astyle option file
+ * 
  */
 
 #include <string.h>
@@ -12,7 +14,7 @@
 #include "lang.h"
 #include <stdlib.h>
 
-#define VERSION_STR "0.2"
+#define VERSION_STR "0.3"
 
 GeanyPlugin		*geany_plugin;
 GeanyData		*geany_data;
@@ -26,6 +28,7 @@ PLUGIN_SET_INFO("AStyle", "Plugin for Artistic Style code formatter.\nAStyle web
 
 typedef struct Settings
 {
+    gchar * optFile;
     gchar * optStr;
     Language lang;
 
@@ -50,6 +53,7 @@ const char* STDCALL AStyleGetVersion (void);
 
 // global variables
 GtkWidget * main_menu_item;
+GtkWidget * entryOptFile;
 GtkWidget * entryOptStr;
 Settings settings;
 
@@ -91,6 +95,8 @@ Language detectLanguage()
 
 void setDefaultSettings()
 {
+    g_free(settings.optFile);
+    settings.optFile = g_strdup("");
     g_free(settings.optStr);
     settings.optStr = g_strdup("--style=gnu");
     settings.lang = detectLanguage();
@@ -104,6 +110,7 @@ int saveSettings()
     GKeyFile * config = g_key_file_new();
     g_key_file_set_string(config,"General","version", VERSION_STR);
     g_key_file_set_integer(config,"General","language",settings.lang);
+    g_key_file_set_string(config,"AStyle","optFile",settings.optFile);
     g_key_file_set_string(config,"AStyle","optStr",settings.optStr);
 
     gchar * filename = getSettingsFileName();
@@ -132,6 +139,13 @@ int loadSettings()
                     settings.lang = LANG_EN;
                 }
             else settings.lang = lang;
+
+            gchar * optFile = g_key_file_get_string(config,"AStyle","optFile",NULL);
+            if (optFile != NULL)
+            {
+                g_free(settings.optFile);
+                settings.optFile = optFile;
+            }
 
             gchar * optStr = g_key_file_get_string(config,"AStyle","optStr",NULL);
             if (optStr != NULL)
@@ -185,8 +199,20 @@ char * formatCode(const char * code)
         mode = "--mode=cs";
     else  mode = "";
 
+    GFile *optFile = g_file_new_for_commandline_arg(settings.optFile);
+    gchar *optData = NULL;
+    if(g_file_query_exists(optFile, NULL))
+        g_file_load_contents(optFile, NULL, &optData, NULL, NULL, NULL);
+    g_object_unref(optFile);
 
-    gchar * optstr = g_strconcat(mode," ",settings.optStr, NULL);
+    gchar * optstr;
+    if(optData != NULL)
+    {
+        optstr = g_strconcat(mode," ",optData, " ", settings.optStr, NULL);
+        g_free(optData);
+    }
+    else
+        optstr = g_strconcat(mode," ",settings.optStr, NULL);
 
     return  AStyleMain(code,
                        optstr,
@@ -225,8 +251,12 @@ void on_configure_response(GtkDialog *dialog, gint response, gpointer user_data)
 {
     if (response == GTK_RESPONSE_OK || response == GTK_RESPONSE_APPLY)
         {
+            g_free(settings.optFile);
+            settings.optFile = g_strdup(gtk_entry_get_text((GtkEntry*)entryOptFile));
+
             g_free(settings.optStr);
             settings.optStr = g_strdup(gtk_entry_get_text((GtkEntry*)entryOptStr));
+
             saveSettings();
         }
 }
@@ -237,12 +267,20 @@ void on_configure_response(GtkDialog *dialog, gint response, gpointer user_data)
 GtkWidget *plugin_configure(GtkDialog *dialog)
 {
     GtkWidget * vbox = gtk_vbox_new(FALSE,0);
-    GtkWidget * labelOptStr = gtk_label_new(getString(0));
+
+    GtkWidget * labelOptFile = gtk_label_new(getString(0));
+    gtk_container_add((GtkContainer*)vbox,labelOptFile);
+    entryOptFile = gtk_entry_new();
+    gtk_entry_set_text((GtkEntry*)entryOptFile, settings.optFile);
+    gtk_container_add((GtkContainer*)vbox,entryOptFile);
+
+    GtkWidget * labelOptStr = gtk_label_new(getString(1));
     gtk_container_add((GtkContainer*)vbox,labelOptStr);
     entryOptStr = gtk_entry_new();
     gtk_entry_set_text((GtkEntry*)entryOptStr, settings.optStr);
     gtk_container_add((GtkContainer*)vbox,entryOptStr);
-    GtkWidget * labelDoc = gtk_label_new(g_strconcat(getString(1),": ","http://astyle.sourceforge.net/astyle.html",NULL));
+
+    GtkWidget * labelDoc = gtk_label_new(g_strconcat(getString(2),": ","http://astyle.sourceforge.net/astyle.html",NULL));
     gtk_label_set_selectable((GtkLabel *)labelDoc, TRUE);
     gtk_container_add((GtkContainer*)vbox,labelDoc);
 

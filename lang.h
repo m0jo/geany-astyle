@@ -12,13 +12,15 @@ typedef enum {	LANG_DE,
 				LANG_COUNT} Language;
 
 // German
-const char * STR_DE[] = {	"AStyle Optionen:",
+const char * STR_DE[] = {   "Astyle Optionen datei:",
+                            "AStyle Optionen:",
                             "Dokumentation",
                             "Ungültige oder unbekannte Sprache"
                         };
 
 // English
-const char * STR_EN[] = {	"AStyle options:",
+const char * STR_EN[] = {   "AStyle option file:",
+                            "AStyle options:",
                             "Documentation",
                             "Invalid or unknown language"
                         };
